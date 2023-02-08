@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import rospy
@@ -9,6 +9,8 @@ from PyQt5.QtGui import QImage, QPixmap
 from std_msgs.msg import Float32MultiArray
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Pose
+from sensor_msgs.msg import Imu, PointCloud2
+from flux_msgs.msg import Frame
 
 import cv2
 import numpy as np
@@ -24,9 +26,9 @@ class DiagnosticWindow(QWidget):
 
         # For checking sensors
         self.topic_states = {}
-        self.sensor_topics = ['topic_1', 'topic_2', 'topic_3']
-        self.msg_types = [Float32MultiArray,
-                          Float32MultiArray, Float32MultiArray]
+        self.sensor_topics = ['/ML/Ouster/points', '/ML/Imu/Data', '/DL/RightImgFork',
+                              '/DL/LeftImgFork', "/DL/LeftImgFront", '/DL/RightImgFront']
+        self.msg_types = [PointCloud2, Imu, Frame, Frame, Frame, Frame]
 
         for topic, type in zip(self.sensor_topics, self.msg_types):
             rospy.Subscriber(
@@ -80,7 +82,7 @@ class DiagnosticWindow(QWidget):
 
     def update_robot_state(self):
         # Retrieve the robot_state parameter
-        state = rospy.get_param("robot_state", "")
+        state = rospy.get_param("state", "")
         self.robot_state_label.setText(
             "<b>Robot State</b>: <span style='color: green'> {} </span>".format(state))
 
@@ -125,20 +127,18 @@ class DiagnosticWindow(QWidget):
         self.system_status_label.setText(system_status)
 
     def update_pallet_detection(self):
-        self.pallet_detect = rospy.get_param("skip_pallet")
+        self.pallet_detect = rospy.get_param("/CT/pallet_present")
         self.pallet_detection.setText(
             "<b>Pallet detected </b>: {}".format(self.pallet_detect))
 
     def sensor_data_callback(self, msg, args):
-        # msg._connection_header['topic'] is a way to get the topic name from which the message was received
         topic = args[0]
         msg_type = args[1]
         try:
             data = rospy.wait_for_message(topic, msg_type, timeout=1.0)
             self.topic_states[topic] = True
         except:
-            pass
-            # self.topic_states[args[0]] = False
+            self.topic_states[topic] = False
 
     def update_obstacle_label(self):
         self.device_name = ['lidar center',
