@@ -22,15 +22,16 @@ class DiagnosticWindow(QWidget):
         # Default values
         self.power_state = None
 
-        # For checking sensors
-        # self.topic_states = {}
-        # self.sensor_topics = ['topic_1', 'topic_2', 'topic_3']
-        # self.msg_types = [Float32MultiArray,
-        #                   Float32MultiArray, Float32MultiArray]
 
-        # for topic, type in zip(self.sensor_topics, self.msg_types):
-        #     rospy.Subscriber(
-        #         topic, type, self.sensor_data_callback, callback_args=(topic, type))
+        # For checking sensors
+        self.topic_states = {}
+        self.sensor_topics = ['topic_1', 'topic_2', 'topic_3']
+        self.msg_types = [Float32MultiArray,
+                          Float32MultiArray, Float32MultiArray]
+
+        for topic, type in zip(self.sensor_topics, self.msg_types):
+            rospy.Subscriber(
+                topic, type, self.sensor_data_callback, callback_args=(topic, type))
 
         rospy.Subscriber("/map", OccupancyGrid, self.map_callback)
         rospy.Subscriber("/pose", Pose, self.pose_callback)
@@ -40,10 +41,12 @@ class DiagnosticWindow(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_robot_state)
         self.timer.timeout.connect(self.update_system_status)
-        self.timer.timeout.connect(self.update_sensor_data)
+        # self.timer.timeout.connect(self.update_sensor_data)
         # self.timer.timeout.connect(self.pose_callback)
         self.timer.timeout.connect(self.update_power_label)
-        self.timer.timeout.connect(self.update_map_viz)
+        self.timer.timeout.connect(self.update_pallet_detection)
+        self.timer.timeout.connect(self.update_obstacle_label)
+        # self.timer.timeout.connect(self.update_map_viz)
         self.timer.start(1000)
 
     def initUI(self):
@@ -53,14 +56,18 @@ class DiagnosticWindow(QWidget):
         self.sensor_data_label = QLabel("Sensor Data: None")
         self.system_status_label = QLabel("System Status: Unknown")
         self.map_label = QLabel("Map Visualization: None")
+        self.pallet_detection = QLabel("Pallet Detection: None")
+        self.obstacle_label = QLabel("Obstacle : None")
 
         # Create a vertical layout to arrange the labels
         vbox = QVBoxLayout()
         vbox.addWidget(self.robot_state_label)
         vbox.addWidget(self.power_label)
-        vbox.addWidget(self.sensor_data_label)
         vbox.addWidget(self.system_status_label)
-        vbox.addWidget(self.map_label)
+        vbox.addWidget(self.sensor_data_label)
+        vbox.addWidget(self.pallet_detection)
+        vbox.addWidget(self.obstacle_label)
+        # vbox.addWidget(self.map_label)
 
         # Set the layout for the widget
         self.setLayout(vbox)
@@ -86,16 +93,6 @@ class DiagnosticWindow(QWidget):
             "<b>Power cosumption</b>: <span style='color: red'>{}</span> ".format(self.power_state))
 
     def update_sensor_data(self):
-
-        # For checking sensors
-        self.topic_states = {}
-        self.sensor_topics = ['topic_1', 'topic_2', 'topic_3']
-        self.msg_types = [Float32MultiArray,
-                          Float32MultiArray, Float32MultiArray]
-
-        for topic, type in zip(self.sensor_topics, self.msg_types):
-            rospy.Subscriber(
-                topic, type, self.sensor_data_callback, callback_args=(topic, type))
         all_topics_publishing = True
         not_publishing = []
         for topic in self.sensor_topics:
@@ -124,6 +121,11 @@ class DiagnosticWindow(QWidget):
 
         self.system_status_label.setText(system_status)
 
+    def update_pallet_detection(self):
+        self.pallet_detect = rospy.get_param("skip_pallet")
+        self.pallet_detection.setText(
+            "<b>Pallet detected </b>: {}".format(self.pallet_detect))
+
     def sensor_data_callback(self, msg, args):
         # msg._connection_header['topic'] is a way to get the topic name from which the message was received
         topic = args[0]
@@ -134,6 +136,24 @@ class DiagnosticWindow(QWidget):
         except:
             pass
             # self.topic_states[args[0]] = False
+
+    def update_obstacle_label(self):
+        self.device_name = ['lidar center',
+                            " lidar left", " lidar right", "camera"]
+        self.device = [False, False, False, False]
+        self.device[0] = rospy.get_param("stop/lidar_center")
+        self.device[1] = rospy.get_param("stop/lidar_left")
+        self.device[2] = rospy.get_param("stop/lidar_right")
+        self.device[3] = rospy.get_param("stop/camera")
+
+        if not any(self.device):
+            print("am ere")
+            self.obstacle_label.setText("<b>No Obstacle detected<b>")
+        else:
+            idx = [i for i, x in enumerate(self.device) if x]
+            obstacles_loc = [self.device_name[i] for i in idx]
+            self.obstacle_label.setText(
+                "<b>Obstacle at: </b>: - " + ", ".join(obstacles_loc))
 
     def map_callback(self, msg):
         self.map_data = np.array(msg.data).reshape(
