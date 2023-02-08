@@ -22,7 +22,6 @@ class DiagnosticWindow(QWidget):
         # Default values
         self.power_state = None
 
-
         # For checking sensors
         self.topic_states = {}
         self.sensor_topics = ['topic_1', 'topic_2', 'topic_3']
@@ -48,6 +47,10 @@ class DiagnosticWindow(QWidget):
         self.timer.timeout.connect(self.update_obstacle_label)
         # self.timer.timeout.connect(self.update_map_viz)
         self.timer.start(1000)
+
+        self.sensor_data_timer = QTimer(self)
+        self.sensor_data_timer.timeout.connect(self.update_sensor_data)
+        self.sensor_data_timer.start(100)
 
     def initUI(self):
         # Create labels to display information
@@ -147,7 +150,6 @@ class DiagnosticWindow(QWidget):
         self.device[3] = rospy.get_param("stop/camera")
 
         if not any(self.device):
-            print("am ere")
             self.obstacle_label.setText("<b>No Obstacle detected<b>")
         else:
             idx = [i for i, x in enumerate(self.device) if x]
