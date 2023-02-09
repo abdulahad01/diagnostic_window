@@ -9,7 +9,7 @@ from PyQt5.QtGui import QImage, QPixmap
 from std_msgs.msg import Float32MultiArray
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Pose
-
+import subprocess
 import cv2
 import numpy as np
 
@@ -21,14 +21,14 @@ class DiagnosticWindow(QWidget):
 
         # Default values
         self.power_state = None
-
+        self.sensors = {'ouster': '192.0.2.0'}
+        self.sensor_topics = {'topic_1': Float32MultiArray,
+                              'topic_2': Float32MultiArray, 'topic_3': Float32MultiArray}
         # For checking sensors
+        self.connected = []
         self.topic_states = {}
-        self.sensor_topics = ['topic_1', 'topic_2', 'topic_3']
-        self.msg_types = [Float32MultiArray,
-                          Float32MultiArray, Float32MultiArray]
 
-        for topic, type in zip(self.sensor_topics, self.msg_types):
+        for topic, type in self.sensor_topics.items():
             rospy.Subscriber(
                 topic, type, self.sensor_data_callback, callback_args=(topic, type))
 
@@ -40,22 +40,23 @@ class DiagnosticWindow(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_robot_state)
         self.timer.timeout.connect(self.update_system_status)
-        # self.timer.timeout.connect(self.update_sensor_data)
-        # self.timer.timeout.connect(self.pose_callback)
         self.timer.timeout.connect(self.update_power_label)
         self.timer.timeout.connect(self.update_pallet_detection)
         self.timer.timeout.connect(self.update_obstacle_label)
         # self.timer.timeout.connect(self.update_map_viz)
+        # self.timer.timeout.connect(self.pose_callback)
         self.timer.start(1000)
 
         self.sensor_data_timer = QTimer(self)
         self.sensor_data_timer.timeout.connect(self.update_sensor_data)
         self.sensor_data_timer.start(100)
+        self.update_sensor_health()
 
     def initUI(self):
         # Create labels to display information
         self.robot_state_label = QLabel("Robot State: Unknown")
         self.power_label = QLabel("Power Consumption: None")
+        self.sensor_health_label = QLabel("Sensor Connected: None")
         self.sensor_data_label = QLabel("Sensor Data: None")
         self.system_status_label = QLabel("System Status: Unknown")
         self.map_label = QLabel("Map Visualization: None")
@@ -67,6 +68,7 @@ class DiagnosticWindow(QWidget):
         vbox.addWidget(self.robot_state_label)
         vbox.addWidget(self.power_label)
         vbox.addWidget(self.system_status_label)
+        vbox.addWidget(self.sensor_health_label)
         vbox.addWidget(self.sensor_data_label)
         vbox.addWidget(self.pallet_detection)
         vbox.addWidget(self.obstacle_label)
@@ -85,8 +87,6 @@ class DiagnosticWindow(QWidget):
             "<b>Robot State</b>: <span style='color: green'> {} </span>".format(state))
 
     def update_map_viz(self):
-        # img = cv2.imread("cat.jpg")
-        # cv2.imshow("image", img)
         pixmap = QPixmap("cat.jpg")
         self.map_label.setPixmap(pixmap)
 
@@ -94,6 +94,19 @@ class DiagnosticWindow(QWidget):
         # Retrieve the power state
         self.power_label.setText(
             "<b>Power cosumption</b>: <span style='color: red'>{}</span> ".format(self.power_state))
+
+    def update_sensor_health_label(self):
+        for sensor in self.sensors:
+            try:
+                subprocess.check_output(
+                    ["ping", "-c", "1", self.sensors[sensor]])
+                # print(True)
+                self.connected.append(sensor)
+            except subprocess.CalledProcessError:
+                # print(False)
+                pass
+        self.sensor_health_label.setText(
+            "Sensors connected:" + ",".join(self.connected))
 
     def update_sensor_data(self):
         all_topics_publishing = True
@@ -156,6 +169,9 @@ class DiagnosticWindow(QWidget):
             obstacles_loc = [self.device_name[i] for i in idx]
             self.obstacle_label.setText(
                 "<b>Obstacle at: </b>: - " + ", ".join(obstacles_loc))
+
+    def update_sensor_health(self):
+        pass
 
     def map_callback(self, msg):
         self.map_data = np.array(msg.data).reshape(
