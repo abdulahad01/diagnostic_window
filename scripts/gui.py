@@ -11,7 +11,7 @@ from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Pose
 from sensor_msgs.msg import Imu, PointCloud2
 from flux_msgs.msg import Frame
-
+import subprocess
 import cv2
 import numpy as np
 
@@ -20,14 +20,16 @@ class DiagnosticWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
-
         # Default values
         self.power_state = None
+        self.connected = []
+        self.sensors = {'ouster lidar':'167.2.11.2'}
 
         # For checking sensors
-        self.sensor_topics = ['test','/ML/Ouster/points', '/ML/Imu/Data', '/DL/RightImgFork',
+        self.sensor_topics = ['test', '/ML/Ouster/points', '/ML/Imu/Data', '/DL/RightImgFork',
                               '/DL/LeftImgFork', "/DL/LeftImgFront", '/DL/RightImgFront']
-        self.msg_types = [Float32MultiArray, PointCloud2, Imu, Frame, Frame, Frame, Frame]
+        self.msg_types = [Float32MultiArray,
+                          PointCloud2, Imu, Frame, Frame, Frame, Frame]
 
         rospy.Subscriber("/map", OccupancyGrid, self.map_callback)
         rospy.Subscriber("/pose", Pose, self.pose_callback)
@@ -44,17 +46,18 @@ class DiagnosticWindow(QWidget):
         self.timer.timeout.connect(self.update_obstacle_label)
         # self.timer.timeout.connect(self.update_map_viz)
         self.timer.start(1000)
-
-        self.sensor_data_timer = QTimer(self)
-        self.sensor_data_timer.timeout.connect(self.update_sensor_data)
-        self.sensor_data_timer.start(100)
+        self.update_sensor_health_label()
+        # self.sensor_data_timer = QTimer(self)
+        # self.sensor_data_timer.timeout.connect(self.update_sensor_data)
+        # self.sensor_data_timer.start(100)
 
     def initUI(self):
         # Create labels to display information
         self.robot_state_label = QLabel("Robot State: Unknown")
         self.power_label = QLabel("Power Consumption: None")
-        self.sensor_data_label = QLabel("Sensor Data: None")
         self.system_status_label = QLabel("System Status: Unknown")
+        self.sensor_health_label = QLabel("Sensor Connected: None")
+        self.sensor_data_label = QLabel("Sensor Data: None")
         self.map_label = QLabel("Map Visualization: None")
         self.pallet_detection = QLabel("Pallet Detection: None")
         self.obstacle_label = QLabel("Obstacle : None")
@@ -64,6 +67,7 @@ class DiagnosticWindow(QWidget):
         vbox.addWidget(self.robot_state_label)
         vbox.addWidget(self.power_label)
         vbox.addWidget(self.system_status_label)
+        vbox.addWidget(self.sensor_health_label)
         vbox.addWidget(self.sensor_data_label)
         vbox.addWidget(self.pallet_detection)
         vbox.addWidget(self.obstacle_label)
@@ -81,6 +85,19 @@ class DiagnosticWindow(QWidget):
         self.robot_state_label.setText(
             "<b>Robot State</b>: <span style='color: green'> {} </span>".format(state))
 
+    def update_sensor_health_label(self):
+        for sensor in self.sensors:
+            try:
+                subprocess.check_output(
+                    ["ping", "-c", "1", self.sensors[sensor]])
+                # print(True)
+                self.connected.append(sensor)
+            except subprocess.CalledProcessError:
+                # print(False)
+                pass
+        self.sensor_health_label.setText(
+            "<b>Sensors connected </b>:<span style='color: green'>" + ", </span>".join(self.connected))
+
     def update_map_viz(self):
         # img = cv2.imread("cat.jpg")
         # cv2.imshow("image", img)
@@ -92,26 +109,6 @@ class DiagnosticWindow(QWidget):
         self.power_label.setText(
             "<b>Power cosumption</b>: <span style='color: red'>{}</span> ".format(self.power_state))
 
-    def update_sensor_data(self):
-        all_topics_publishing = True
-        self.topic_states = {}
-        not_publishing = []
-
-        for topic, type in zip(self.sensor_topics, self.msg_types):
-            rospy.Subscriber(
-                topic, type, self.sensor_data_callback, callback_args=(topic, type))
-
-        for topic in self.sensor_topics:
-            if topic not in self.topic_states:
-                all_topics_publishing = False
-                not_publishing.append(topic)
-
-        if all_topics_publishing:
-            self.sensor_data_label.setText(
-                "<b>Sensor Data</b>: <span style='color: green'> All topics publishing. </span>")
-        else:
-            self.sensor_data_label.setText(
-                "<b>Sensor Data</b>: Not publishing - " + ", ".join(not_publishing))
 
     def update_system_status(self):
         cpu_percent = psutil.cpu_percent()
@@ -131,13 +128,6 @@ class DiagnosticWindow(QWidget):
         self.pallet_detect = rospy.get_param("/CT/pallet_present")
         self.pallet_detection.setText(
             "<b>Pallet detected </b>: {}".format(self.pallet_detect))
-
-    def sensor_data_callback(self, msg, args):
-        topic = args[0]
-        msg_type = args[1]
-        # data = rospy.wait_for_message(topic, msg_type, timeout=10.0)
-        self.topic_states[topic] = True
-        print("data received ", topic)
 
     def update_obstacle_label(self):
         self.device_name = ['lidar center',
