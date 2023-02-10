@@ -50,7 +50,7 @@ class DiagnosticWindow(QWidget):
         self.sensor_data_timer = QTimer(self)
         self.sensor_data_timer.timeout.connect(self.update_sensor_data)
         self.sensor_data_timer.start(100)
-        self.update_sensor_health()
+        self.update_sensor_health_label()
 
     def initUI(self):
         # Create labels to display information
@@ -93,7 +93,7 @@ class DiagnosticWindow(QWidget):
     def update_power_label(self):
         # Retrieve the power state
         self.power_label.setText(
-            "<b>Power cosumption</b>: <span style='color: red'>{}</span> ".format(self.power_state))
+            "<b>Power cosumption</b>: <span style='color: red'>{} Amps</span> ".format(self.power_state))
 
     def update_sensor_health_label(self):
         for sensor in self.sensors:
@@ -106,7 +106,7 @@ class DiagnosticWindow(QWidget):
                 # print(False)
                 pass
         self.sensor_health_label.setText(
-            "Sensors connected:" + ",".join(self.connected))
+            "<b>Sensors connected </b>:<span style='color: green'>" + ", </span>".join(self.connected))
 
     def update_sensor_data(self):
         all_topics_publishing = True
@@ -169,9 +169,6 @@ class DiagnosticWindow(QWidget):
             obstacles_loc = [self.device_name[i] for i in idx]
             self.obstacle_label.setText(
                 "<b>Obstacle at: </b>: - " + ", ".join(obstacles_loc))
-
-    def update_sensor_health(self):
-        pass
 
     def map_callback(self, msg):
         self.map_data = np.array(msg.data).reshape(
