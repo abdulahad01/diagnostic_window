@@ -138,7 +138,7 @@ class DiagnosticWindow(QWidget):
         self.system_status_label.setText(system_status)
 
     def update_pallet_detection(self):
-        self.pallet_detect = rospy.get_param("skip_pallet")
+        self.pallet_detect = not(rospy.get_param("skip_pallet"))
         self.pallet_detection.setText(
             "<b>Pallet detected </b>: {}".format(self.pallet_detect))
 
