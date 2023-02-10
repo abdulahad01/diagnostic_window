@@ -25,14 +25,9 @@ class DiagnosticWindow(QWidget):
         self.power_state = None
 
         # For checking sensors
-        self.topic_states = {}
-        self.sensor_topics = ['/ML/Ouster/points', '/ML/Imu/Data', '/DL/RightImgFork',
+        self.sensor_topics = ['test','/ML/Ouster/points', '/ML/Imu/Data', '/DL/RightImgFork',
                               '/DL/LeftImgFork', "/DL/LeftImgFront", '/DL/RightImgFront']
-        self.msg_types = [PointCloud2, Imu, Frame, Frame, Frame, Frame]
-
-        for topic, type in zip(self.sensor_topics, self.msg_types):
-            rospy.Subscriber(
-                topic, type, self.sensor_data_callback, callback_args=(topic, type))
+        self.msg_types = [Float32MultiArray, PointCloud2, Imu, Frame, Frame, Frame, Frame]
 
         rospy.Subscriber("/map", OccupancyGrid, self.map_callback)
         rospy.Subscriber("/pose", Pose, self.pose_callback)
@@ -99,7 +94,13 @@ class DiagnosticWindow(QWidget):
 
     def update_sensor_data(self):
         all_topics_publishing = True
+        self.topic_states = {}
         not_publishing = []
+
+        for topic, type in zip(self.sensor_topics, self.msg_types):
+            rospy.Subscriber(
+                topic, type, self.sensor_data_callback, callback_args=(topic, type))
+
         for topic in self.sensor_topics:
             if topic not in self.topic_states:
                 all_topics_publishing = False
@@ -134,11 +135,9 @@ class DiagnosticWindow(QWidget):
     def sensor_data_callback(self, msg, args):
         topic = args[0]
         msg_type = args[1]
-        try:
-            data = rospy.wait_for_message(topic, msg_type, timeout=1.0)
-            self.topic_states[topic] = True
-        except:
-            self.topic_states[topic] = False
+        # data = rospy.wait_for_message(topic, msg_type, timeout=10.0)
+        self.topic_states[topic] = True
+        print("data received ", topic)
 
     def update_obstacle_label(self):
         self.device_name = ['lidar center',
